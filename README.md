@@ -57,7 +57,7 @@ torso 허용영역·밀기, 팔 길이·머리 높이 한도, 충돌 보호, 관
 ```
 
 - `use_torso: true`: 몸통 Cartesian 명령 하나에 양손 목표만 넣는다. torso는 제어기가 푼다.
-- `use_torso: false`: torso는 시작 관절값에 고정한다. 팔마다 base→ee Cartesian에 리더암 팔꿈치(arm_3) 각도를 그대로 `add_joint_position_target`으로 더한다. 버튼을 누른 동안만 리더암 각도를 따르고, 놓으면 마지막 값을 유지한다.
+- `use_torso: false`: torso는 시작 관절값에 고정한다. 팔마다 base→ee Cartesian에 리더암 arm_2(어깨 yaw, 위팔 돌림) 각도를 그대로 `add_joint_position_target`으로 더한다. 버튼을 누른 동안만 리더암 각도를 따르고, 놓으면 마지막 값을 유지한다.
 - 기록은 `logs/direct_날짜_시각.csv`.
 
 ### 실행하면 일어나는 일
@@ -143,7 +143,7 @@ torso 허용영역·밀기, 팔 길이·머리 높이 한도, 충돌 보호, 관
 | 파일 | 내용 |
 |---|---|
 | `teleop.py` | 매핑, torso 비율·허용영역·팔 길이·머리 높이 한도, 텔레옵 루프 |
-| `teleop_direct.py` | 실물 확인용 단순 텔레옵: 매핑한 base→ee 4×4를 안전 처리 없이 그대로 보낸다 (torso 안 쓰면 팔꿈치 관절 목표 추가) |
+| `teleop_direct.py` | 실물 확인용 단순 텔레옵: 매핑한 base→ee 4×4를 안전 처리 없이 그대로 보낸다 (torso 안 쓰면 arm_2 관절 목표 추가) |
 | `robot.py` | 로봇 접속·준비·상태·명령 스트림 (Cartesian, 관절), torso 관절 한계 투영 (`Robot`) |
 | `arm_ik.py` | 팔 관절 IK (`ArmIK`). rby1_3d_mouse_teleop의 joint_ik.py에서 가져옴 |
 | `leader_arm.py` | 리더암 자세 정렬·중력 보상·버튼 클러치·트리거 (`LeaderArm`) |

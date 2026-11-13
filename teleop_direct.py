@@ -5,7 +5,7 @@ teleop.py에서 뺀 것: torso 비율·허용영역·밀기, 팔 길이·머리 
 남긴 것: 시작 절차(전원·서보·레디자세·그리퍼·리더암 정렬), 버튼 클러치 매핑(teleop.map_hand), 정지 절차(teleop.shutdown).
 
   use_torso true : 몸통 Cartesian 명령 하나에 base→ee_right, base→ee_left (torso는 제어기가 푼다)
-  use_torso false: torso는 시작 관절값으로 고정, 팔마다 base→ee Cartesian + 리더암 팔꿈치(arm_3) 각도를 그대로 관절 목표로
+  use_torso false: torso는 시작 관절값으로 고정, 팔마다 base→ee Cartesian + 리더암 arm_2(어깨 yaw, 위팔 돌림) 각도를 그대로 관절 목표로
 
 사용:
   python teleop_direct.py --use_torso false
@@ -26,7 +26,7 @@ from robot import ARM_L, ARM_R, TORSO, Robot
 from so3 import log_so3
 from teleop import LOG_DIR, ArmFK, map_hand, shutdown
 
-ELBOW = 3  # 팔 관절 안에서 arm_3(팔꿈치) 순번. 리더암 관절값은 오른팔 0~6, 왼팔 7~13
+ARM2 = 2  # 팔 관절 안에서 arm_2(어깨 yaw, 위팔 돌림) 순번. 리더암 관절값은 오른팔 0~6, 왼팔 7~13
 
 
 def run(cfg, robot, leader, gripper, stop_event):
@@ -35,9 +35,9 @@ def run(cfg, robot, leader, gripper, stop_event):
     robot.start_state_update()
     q, T_bt, T_be, _ = robot.kinematics()
     torso_q = None if cfg["use_torso"] else q[robot.torso_idx].copy()
-    elbow_idx = [robot.model.right_arm_idx[ELBOW], robot.model.left_arm_idx[ELBOW]]
+    arm2_idx = [robot.model.right_arm_idx[ARM2], robot.model.left_arm_idx[ARM2]]
     target = [np.array(T_be[0]), np.array(T_be[1])]  # 누르기 전에는 지금 손 자세 유지
-    elbow = [float(q[j]) for j in elbow_idx]          # 누르기 전에는 지금 팔꿈치 각도 유지
+    arm2 = [float(q[j]) for j in arm2_idx]            # 누르기 전에는 지금 arm_2 각도 유지
     engaged = [None, None]                            # 팔마다 누른 순간의 (T_base_torso5, T_torso5_ee, 리더암 FK)
 
     log_file = None
@@ -50,7 +50,7 @@ def run(cfg, robot, leader, gripper, stop_event):
         log = csv.writer(log_file)
         log.writerow(["t", "btn_r", "btn_l"] + [f"qL{i}" for i in range(14)]
                      + [f"tgt_{s}_{a}" for s in "rl" for a in ("x", "y", "z", "wx", "wy", "wz")]
-                     + ["elbow_tgt_r", "elbow_tgt_l"] + [f"q_{n}" for n in TORSO + ARM_R + ARM_L])
+                     + ["arm2_tgt_r", "arm2_tgt_l"] + [f"q_{n}" for n in TORSO + ARM_R + ARM_L])
         print(f"log: {log_path}", flush=True)
 
     robot.open_stream()
@@ -73,17 +73,17 @@ def run(cfg, robot, leader, gripper, stop_event):
                         engaged[i] = (np.array(T_bt), np.linalg.inv(T_bt) @ T_be[i], T_L[i])
                     T_bt0, T_tee0, T_L0 = engaged[i]
                     target[i] = T_bt0 @ map_hand(T_L[i], T_L0, T_tee0, cfg["scale"])
-                    elbow[i] = float(qL[7 * i + ELBOW])
+                    arm2[i] = float(qL[7 * i + ARM2])
 
             if cfg["use_torso"]:
                 robot.send(target[0], target[1])
             else:
-                robot.send_arms_cartesian(torso_q, target[0], target[1], elbow)
+                robot.send_arms_cartesian(torso_q, target[0], target[1], arm2)
 
             if log_file and sample is not None:
                 log.writerow([f"{tick - t0:.3f}", int(pressed[0]), int(pressed[1])] + list(np.round(qL, 5))
                              + [round(float(v), 5) for T in target for v in np.r_[T[:3, 3], log_so3(T[:3, :3])]]
-                             + [round(e, 5) for e in elbow]
+                             + [round(a, 5) for a in arm2]
                              + list(np.round(q[robot.torso_idx + robot.arm_idx], 5)))
             time.sleep(max(0.0, period - (time.time() - tick)))
     finally:
