@@ -251,15 +251,22 @@ class Robot:
             setter(b)
         self._send_body(rc)
 
-    def send_arms_cartesian(self, torso_q, T_right, T_left):
-        """torso는 관절 위치로 붙잡고 팔만 base→ee Cartesian 명령 (use_torso false)."""
+    def send_arms_cartesian(self, torso_q, T_right, T_left, elbow_q=None):
+        """torso는 관절 위치로 붙잡고 팔만 base→ee Cartesian 명령 (use_torso false).
+
+        elbow_q (오른팔, 왼팔) [rad]가 있으면 팔마다 arm_3(팔꿈치) 관절 목표를 같은 Cartesian 명령에 더한다.
+        """
         c, t = self.cfg, self.cfg["command_minimum_time_s"]
         rc = rby.BodyComponentBasedCommandBuilder().set_torso_command(
             rby.JointPositionCommandBuilder().set_command_header(self._header()).set_minimum_time(t).set_position(torso_q))
-        for setter, link, T in ((rc.set_right_arm_command, "ee_right", T_right), (rc.set_left_arm_command, "ee_left", T_left)):
-            setter(rby.CartesianCommandBuilder().set_command_header(self._header()).set_minimum_time(t)
-                   .add_target("base", link, T, c["hand_linear_velocity"], c["hand_angular_velocity"],
-                               c["acceleration_limit_scaling"]))
+        for i, (setter, side, T) in enumerate(((rc.set_right_arm_command, "right", T_right),
+                                               (rc.set_left_arm_command, "left", T_left))):
+            b = (rby.CartesianCommandBuilder().set_command_header(self._header()).set_minimum_time(t)
+                 .add_target("base", f"ee_{side}", T, c["hand_linear_velocity"], c["hand_angular_velocity"],
+                             c["acceleration_limit_scaling"]))
+            if elbow_q is not None:
+                b.add_joint_position_target(f"{side}_arm_3", float(elbow_q[i]))
+            setter(b)
         self._send_body(rc)
 
     def close_stream(self):

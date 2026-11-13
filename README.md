@@ -46,6 +46,20 @@ settings.yaml의 어떤 값이든 명령줄 `--키 값`으로 덮어쓸 수 있�
 .venv/bin/python teleop.py --robot_address 192.168.30.1:50051 --use_torso false --scale 1.0
 ```
 
+### 단순 텔레옵 (실물 확인용, 안전 처리 없음)
+
+`teleop_direct.py`는 매핑으로 얻은 base→ee 4×4를 그대로 `set_body_command`로 보낸다.
+torso 허용영역·밀기, 팔 길이·머리 높이 한도, 충돌 보호, 관절 IK, 리더암 통신 장애 감시가 **없다**.
+시작 절차(전원·서보·레디자세·그리퍼·리더암 정렬), 버튼 클러치, 정지 절차는 `teleop.py`와 같다. 설정도 같은 `settings.yaml`을 쓴다.
+
+```bash
+.venv/bin/python teleop_direct.py --use_torso false
+```
+
+- `use_torso: true`: 몸통 Cartesian 명령 하나에 양손 목표만 넣는다. torso는 제어기가 푼다.
+- `use_torso: false`: torso는 시작 관절값에 고정한다. 팔마다 base→ee Cartesian에 리더암 팔꿈치(arm_3) 각도를 그대로 `add_joint_position_target`으로 더한다. 버튼을 누른 동안만 리더암 각도를 따르고, 놓으면 마지막 값을 유지한다.
+- 기록은 `logs/direct_날짜_시각.csv`.
+
 ### 실행하면 일어나는 일
 
 1. 로봇에 접속하고, 전원·서보가 꺼져 있으면 켠 뒤 컨트롤 매니저를 활성화한다. 서보는 `servo_regex`(기본 torso·양팔)만 켠다. 바퀴(모바일)와 머리는 켜지 않는다.
@@ -129,6 +143,7 @@ settings.yaml의 어떤 값이든 명령줄 `--키 값`으로 덮어쓸 수 있�
 | 파일 | 내용 |
 |---|---|
 | `teleop.py` | 매핑, torso 비율·허용영역·팔 길이·머리 높이 한도, 텔레옵 루프 |
+| `teleop_direct.py` | 실물 확인용 단순 텔레옵: 매핑한 base→ee 4×4를 안전 처리 없이 그대로 보낸다 (torso 안 쓰면 팔꿈치 관절 목표 추가) |
 | `robot.py` | 로봇 접속·준비·상태·명령 스트림 (Cartesian, 관절), torso 관절 한계 투영 (`Robot`) |
 | `arm_ik.py` | 팔 관절 IK (`ArmIK`). rby1_3d_mouse_teleop의 joint_ik.py에서 가져옴 |
 | `leader_arm.py` | 리더암 자세 정렬·중력 보상·버튼 클러치·트리거 (`LeaderArm`) |
