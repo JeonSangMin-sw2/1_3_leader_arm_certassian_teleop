@@ -22,6 +22,7 @@ class Robot:
         if not self.robot.connect():
             raise RuntimeError(f"로봇에 접속하지 못했습니다: {cfg['robot_address']}")
         self.model = self.robot.model()
+        self.power_names = [p.name for p in self.robot.get_robot_info().power_infos]  # 실물 M: 12v 등, 시뮬레이터: main
         self.dyn = self.robot.get_dynamics()  # 접속한 로봇 자신의 모델 (v1.3이면 v1.3)
         self.dyn_state = self.dyn.make_state(["base", "link_torso_5", "ee_right", "ee_left"],
                                              self.model.robot_joint_names)
@@ -30,6 +31,7 @@ class Robot:
         self.arm_idx = list(self.model.right_arm_idx) + list(self.model.left_arm_idx)
         self._latest = {}
         self._stream = None
+        self._state_streaming = False
 
     def ensure_ready(self):
         """전원·서보는 컨트롤 매니저가 Enabled가 아닐 때만 바꾼다 (Enabled 중에 바꾸면 MajorFault)."""
@@ -39,18 +41,40 @@ class Robot:
                 if self.robot.reset_fault_control_manager():
                     break
                 time.sleep(0.5)
-        if not (self.robot.is_power_on(".*") and self.robot.is_servo_on(".*")):
+        power, servo = self.cfg["power_regex"], self.cfg["servo_regex"]
+        if not (self.robot.is_power_on(power) and self.robot.is_servo_on(servo)):
             self.robot.disable_control_manager()
             time.sleep(0.5)
-            if not self.robot.power_on(".*"):
-                raise RuntimeError("전원을 켜지 못했습니다")
-            time.sleep(1.5)
-            if not self.robot.servo_on(".*"):
-                raise RuntimeError("서보를 켜지 못했습니다")
+            if not self.robot.power_on(power):
+                raise RuntimeError(f"전원({power})을 켜지 못했습니다")
+            time.sleep(1.5)  # 12V 안정화, 리더암 모터 부팅 (예제 35는 1.0 s)
+            if not self.robot.servo_on(servo):
+                raise RuntimeError(f"서보({servo})를 켜지 못했습니다")
             time.sleep(1.0)
             self.robot.reset_fault_control_manager()
         if not self.robot.enable_control_manager():
             raise RuntimeError("컨트롤 매니저를 활성화하지 못했습니다")
+
+    def ensure_tool_flange_12v(self):
+        """그리퍼 전원(툴 플랜지)을 12V로 맞춘다. 12V면 그대로, 꺼져 있으면 켜고, 다른 전압이면 끈 뒤 켠다.
+
+        rby1_3d_mouse_teleop에서 가져왔다: 다른 패키지가 다른 전압으로 켜 둔 채 넘어오면 그리퍼 homing이 제대로 안 됐다.
+        """
+        voltage = lambda side: int(getattr(self.robot.get_state(), f"tool_flange_{side}").output_voltage)
+        for side in ("right", "left"):
+            if voltage(side) == 12:
+                continue
+            if voltage(side) != 0:
+                if not self.robot.set_tool_flange_output_voltage(side, 0):
+                    raise RuntimeError(f"{side} 툴 플랜지 전원을 끄지 못했습니다")
+                time.sleep(0.5)
+            if not self.robot.set_tool_flange_output_voltage(side, 12):
+                raise RuntimeError(f"{side} 툴 플랜지를 12V로 켜지 못했습니다")
+            deadline = time.monotonic() + 2.0
+            while voltage(side) != 12:
+                if time.monotonic() > deadline:
+                    raise RuntimeError(f"{side} 툴 플랜지가 2초 안에 12V가 되지 않았습니다 (지금 {voltage(side)}V)")
+                time.sleep(0.1)
 
     def move_ready(self, minimum_time=None):
         pose = self.cfg["ready_pose_deg"]
@@ -75,11 +99,37 @@ class Robot:
         self._latest.clear()  # 이전 실행의 상태를 새 상태처럼 쓰지 않게
         self.robot.start_state_update(lambda rs, cm: self._latest.update(rs=rs, cm=cm),
                                       1.0 / self.cfg["command_period_s"])
+        self._state_streaming = True
         while "rs" not in self._latest:
             time.sleep(0.01)
 
     def stop_state_update(self):
-        self.robot.stop_state_update()
+        if self._state_streaming:
+            self.robot.stop_state_update()
+            self._state_streaming = False
+
+    def shutdown(self):
+        """소프트 정지의 로봇 쪽 (예제 35): 동작 중인 제어 취소 → 컨트롤 매니저 disable → 12V(리더암·툴 플랜지) 끔."""
+        self.close_stream()
+        self.stop_state_update()
+        cm = self.robot.get_control_manager_state()
+        if cm.state == rby.ControlManagerState.State.Enabled:
+            if cm.control_state != rby.ControlManagerState.ControlState.Idle:
+                self.robot.cancel_control()
+                time.sleep(0.1)
+            self.robot.disable_control_manager()
+            time.sleep(0.2)
+        if "12v" not in self.power_names:
+            print(f"[종료] 12v 전원 장치가 없어 끄지 않습니다 (전원 장치: {self.power_names})", flush=True)
+        elif not self.robot.power_off("12v"):
+            raise RuntimeError("12V 전원을 끄지 못했습니다")
+
+    def power_off_all(self):
+        """즉시 정지 (예제 35 USE_SOFT_STOP=False): 전원 라인을 모두 끈다."""
+        self.close_stream()
+        self.stop_state_update()
+        if not self.robot.power_off(".*"):
+            raise RuntimeError("전원을 끄지 못했습니다")
 
     def kinematics(self):
         """최신 상태에서 (q, T_base_torso5, (T_base_ee_right, T_base_ee_left), 가장 가까운 링크 거리)."""

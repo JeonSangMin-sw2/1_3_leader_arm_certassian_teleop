@@ -10,7 +10,7 @@ SETTINGS_PATH = PROJECT_DIR / "settings.yaml"
 PATH_KEYS = ("fk_urdf", "leader_urdf")  # 상대 경로면 프로젝트 폴더 기준
 
 KEYS = (
-    "robot_address", "robot_model", "move_to_ready", "ready_pose_deg", "ready_minimum_time_s",
+    "robot_address", "robot_model", "power_regex", "servo_regex", "move_to_ready", "ready_pose_deg", "ready_minimum_time_s",
     "command_period_s", "command_minimum_time_s", "control_hold_time_s",
     "hand_linear_velocity", "hand_angular_velocity", "torso_linear_velocity", "torso_angular_velocity",
     "acceleration_limit_scaling", "collision_guard_m",
@@ -20,7 +20,7 @@ KEYS = (
     "torso_mode", "hand_reference", "torso_ratio_xyz", "torso_ratio_rot", "torso_region_xy", "torso_z_limits", "torso_rot_limit_deg",
     "torso_joint_limits_deg",
     "leader_device", "leader_urdf", "leader_period_s", "leader_torque_limit", "leader_viscous_gain",
-    "leader_gravity_gain",
+    "leader_gravity_gain", "leader_timeout_s", "soft_stop_time_s", "fault_soft_stop",
     "use_gripper", "gripper_max_open", "gripper_invert_trigger",
     "log_enabled",
 )

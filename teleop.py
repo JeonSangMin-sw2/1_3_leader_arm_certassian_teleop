@@ -25,6 +25,7 @@ import yaml
 
 import settings
 from arm_ik import ArmIK
+from leader_arm import LeaderArmFault
 from robot import ARM_L, ARM_R, TORSO, Robot
 from so3 import exp_so3, log_so3
 
@@ -325,6 +326,9 @@ class Teleop:
             while not stop_event.is_set() and (duration is None or time.time() - t0 < duration):
                 tick = time.time()
                 q, T_bt, T_be, dist = robot.kinematics()
+                alive = getattr(self.leader, "alive", None)  # 시험용 합성 리더암에는 없다
+                if alive is not None and not alive(cfg["leader_timeout_s"]):
+                    raise LeaderArmFault(f"리더암 제어 콜백이 {cfg['leader_timeout_s']} s 넘게 없습니다 (통신 장애)")
                 sample = self.leader.latest()
                 pressed = sample[1] if sample is not None else (False, False)
                 if sample is not None:
@@ -400,34 +404,60 @@ class Teleop:
         return log_path
 
 
+def shutdown(robot, leader, gripper, soft):
+    """예제 35와 같은 종료 순서. 한 단계가 실패해도 알리고 나머지 정지 단계는 계속한다.
+
+    soft: 스트림 취소 → 리더암 토크를 soft_stop_time_s 동안 줄임 → 그리퍼 끔 → 제어 취소·disable → 12V 끔.
+    아니면: 스트림 취소 → 리더암·그리퍼 토크 즉시 끔 → 전원 라인 모두 끔.
+    """
+    print(f"[종료] {'소프트 정지' if soft else '즉시 정지'} 시작", flush=True)
+    steps = [("명령 스트림 취소", robot.close_stream)]
+    if leader is not None:
+        steps.append(("리더암 토크 끔", lambda: leader.stop(soft)))
+    if gripper is not None:
+        steps.append(("그리퍼 끔", gripper.disconnect))
+    steps.append(("제어 취소·disable·12V 끔", robot.shutdown) if soft else ("전원 모두 끔", robot.power_off_all))
+    for name, step in steps:
+        try:
+            step()
+        except Exception as e:  # 정지 절차는 끝까지 간다
+            print(f"[종료] {name} 실패: {e}", flush=True)
+    print("[종료] 완료", flush=True)
+
+
 def main():
     cfg = settings.parse(description=__doc__)
     validate(cfg)
     from leader_arm import LeaderArm
 
     robot = Robot(cfg)
-    print(f"robot {cfg['robot_address']}  scale={cfg['scale']}  torso={cfg['torso_mode']}  "
-          f"ratio_xyz={cfg['torso_ratio_xyz']}  ratio_rot={cfg['torso_ratio_rot']}")
-    robot.ensure_ready()
-    if cfg["move_to_ready"]:
-        robot.move_ready()
-    gripper = None
-    if cfg["use_gripper"]:
-        from gripper import Gripper
-        gripper = Gripper(cfg)
-        gripper.connect()  # homing으로 손가락이 양 끝까지 움직인다
-    leader = LeaderArm(cfg)
+    print(f"robot {cfg['robot_address']}  control={cfg['control_mode']}  use_torso={cfg['use_torso']}  "
+          f"impedance={cfg['impedance_enabled']}  scale={cfg['scale']}")
     stop_event = threading.Event()
-    signal.signal(signal.SIGINT, lambda *_: stop_event.set())
-    leader.start()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop_event.set())
+    leader = gripper = None
+    soft = True  # Ctrl+C·정상 종료·시작 실패는 소프트 정지 (예제 35)
+    robot.ensure_ready()
     try:
+        if cfg["move_to_ready"]:
+            robot.move_ready()
+        if cfg["use_gripper"]:
+            from gripper import Gripper
+            robot.ensure_tool_flange_12v()  # 그리퍼 전원
+            gripper = Gripper(cfg)
+            gripper.connect()  # homing으로 손가락이 양 끝까지 움직인다
+        leader = LeaderArm(cfg)
+        leader.start()
         log_path = Teleop(cfg, robot, leader, gripper).run(stop_event=stop_event)
         if log_path:
             print(f"log: {log_path}")
+    except LeaderArmFault as e:
+        soft = cfg["fault_soft_stop"]
+        print(f"[장애] {e}", flush=True)
+        raise
     finally:
-        leader.stop()
-        if gripper is not None:
-            gripper.disconnect()
+        shutdown(robot, leader, gripper, soft)
 
 
 if __name__ == "__main__":

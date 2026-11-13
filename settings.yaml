@@ -5,6 +5,8 @@
 # 로봇
 robot_address: "127.0.0.1:50051" # 127.0.0.1:50051은 시뮬레이터, 192.168.30.1:50051은 UPC에서의 사용 IP
 robot_model: "m"
+power_regex: ".*" # 켤 전원 라인 (5V·12V·24V·48V 등. 리더암은 12V로 켜진다). SDK 예제 35 기본값
+servo_regex: "torso_.*|right_arm_.*|left_arm_.*" # 켤 서보. 바퀴(모바일)와 머리는 켜지 않는다 (SDK 예제 35 기본값)
 move_to_ready: true # 시작할 때 레디자세로 이동
 ready_pose_deg: # SDK 예제 35의 M 레디자세에서 손목(arm_5)만 70° → 45°. v1.3은 arm_5가 ±50°라 70°를 거부한다
   torso: [0.0, 45.0, -90.0, 45.0, 0.0, 0.0]
@@ -64,6 +66,11 @@ leader_period_s: 0.01 # 100 Hz
 leader_torque_limit: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 leader_viscous_gain: [0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001, 0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001]
 leader_gravity_gain: 0.8 # 버튼을 누르고 있을 때 중력 보상 배율
+leader_timeout_s: 0.1 # 리더암 제어 콜백이 이 시간 넘게 없으면 통신 장애로 보고 정지 (예제 35: 100 Hz에서 10회 연속 실패)
+
+# 정지 (예제 35)
+soft_stop_time_s: 3.0 # 소프트 정지에서 리더암 토크를 줄이는 시간 (10단계)
+fault_soft_stop: true # 리더암 장애 때 true: 소프트 정지(토크 감소 → disable → 12V 끔), false: 즉시 전원 모두 끔. Ctrl+C·정상 종료는 항상 소프트
 
 # 그리퍼 (리더암 트리거 0~1000 = 닫힘 정도, 예제 35처럼 버튼 클러치와 상관없이 따른다)
 use_gripper: false # 시뮬레이터에는 그리퍼 장치(/dev/rby1_gripper)가 없어서 false. 실물에선 true
