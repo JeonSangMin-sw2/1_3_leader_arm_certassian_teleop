@@ -1,0 +1,74 @@
+# 리더암 → RB-Y1 Cartesian 텔레옵 설정. 이 값들이 기본값이고, 명령줄에서 --키 값 으로 덮어쓸 수 있다.
+#   예) python teleop.py --scale 1.3 --torso_ratio_xyz "[0.5, 0.2, 0.3]"
+# 키를 빠뜨리거나 모르는 키가 있으면 시작할 때 오류로 멈춘다.
+
+# 로봇
+robot_address: "127.0.0.1:50051" # 127.0.0.1:50051은 시뮬레이터, 192.168.30.1:50051은 UPC에서의 사용 IP
+robot_model: "m"
+move_to_ready: true # 시작할 때 레디자세로 이동
+ready_pose_deg: # SDK 예제 35의 M 레디자세에서 손목(arm_5)만 70° → 45°. v1.3은 arm_5가 ±50°라 70°를 거부한다
+  torso: [0.0, 45.0, -90.0, 45.0, 0.0, 0.0]
+  right_arm: [0.0, -5.0, 0.0, -120.0, 0.0, 45.0, 0.0]
+  left_arm: [0.0, 5.0, 0.0, -120.0, 0.0, 45.0, 0.0]
+ready_minimum_time_s: 5.0
+
+# 명령 스트림 (몸통 Cartesian 명령 하나로 torso와 양팔을 함께 푼다)
+command_period_s: 0.01 # 100 Hz (SDK 예제 35와 같음)
+command_minimum_time_s: 0.06
+control_hold_time_s: 1.0 # 명령이 끊기면 이 시간 뒤 정지
+hand_linear_velocity: 1.0 # [m/s]
+hand_angular_velocity: 3.14 # [rad/s]
+torso_linear_velocity: 0.5 # [m/s]
+torso_angular_velocity: 1.57 # [rad/s]
+acceleration_limit_scaling: 1.0 # (0, 1]. 0.8보다 1.0이 추종 지연이 짧았다 (시뮬레이터 1 Hz 사인파 257 → 186 ms)
+collision_guard_m: 0.02 # 링크 사이 거리가 이보다 작아지면서 계속 줄면 정지 (SDK 예제 35와 같은 값)
+
+# 제어 방식
+control_mode: joint_ik # joint_ik: 손 목표를 관절 IK로 풀어 관절 명령 (여유 자유도는 자세 유지로 붙잡는다). cartesian: 4×4를 Cartesian 명령으로 보내고 제어기가 IK
+use_torso: true # false면 torso를 시작 자세에 고정하고 팔만 쓴다 (리더암 v1.2 FK → v1.3 팔에 거의 1:1)
+impedance_enabled: false # true면 팔을 관절 임피던스로 (joint_ik에서만). torso는 위치 명령
+arm_stiffness: [150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0] # [Nm/rad] rby1_3d_mouse_teleop 값
+arm_torque_limit: [40.0, 40.0, 40.0, 30.0, 30.0, 30.0, 30.0] # [Nm]
+arm_damping_ratio: 1.0
+ik_posture_weight: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] # 관절 IK 관절 변화량 비용 (위치 오차 1000/m, 회전 오차 100/rad 기준)
+
+# 매핑
+scale: 1.0 # v1.2 팔 FK(리더암의 약 1.43배) 위에 곱하는 추가 위치 배율. 회전은 1:1
+fk_urdf: models/rby1m_v1.2.urdf # 리더암 관절값을 넣어 손 자세를 구하는 모델 (리더암과 관절 순서·축·0점이 같다)
+arm_reach_ratio: 0.9 # 어깨-손목 거리 한도 = 팔을 다 편 길이 × 이 값. 넘으면 torso를 손 쪽으로 옮기고, 그래도 넘으면 손 목표를 당긴다.
+  # 팔꿈치 약 -35°(편 쪽)에서 제어기가 Singularity로 명령을 끝낸 것을 확인했다. 0.9는 팔꿈치 약 -53°에 해당 (v1.3)
+
+hand_head_clearance_m: 0.0 # [m] 손(ee) 목표 높이 상한 = 머리 회전 중심(torso_5 위 0.20 m) 높이 - 이 값. 머리 위는 카메라로 못 봐서 막는다
+soft_margin_m: 0.03 # [m] 한계 앞 이 구간부터 부드럽게 감속해 한계에 점근한다 (허용영역, torso 밀기, 손 당기기). 0이면 한계에서 바로 자른다
+
+# torso
+torso_mode: region # use_torso일 때. region: torso_5 목표를 직접 계산(비율 + 허용영역), free: torso 목표 없이 제어기에 맡김 (cartesian에서만)
+hand_reference: torso # cartesian + region일 때 손 목표 기준. torso: 허용영역·머리 높이를 지키고 다 못 맞추면 손이 양보. base: 손을 지키지만 torso가 영역 밖으로(split에서 71 mm), 손이 머리 위로 갈 수 있다
+torso_ratio_xyz: [0.3, 0.3, 0.3] # 손 이동량 중 torso_5가 맡는 비율 (base x, y, z). 0이면 팔만, 1이면 torso가 전부
+torso_ratio_rot: [0.0, 0.0, 0.0] # 손 회전량 중 torso_5가 맡는 비율 (base 축 roll, pitch, yaw)
+torso_region_xy: [[0.20, 0.10], [0.20, -0.10], [-0.10, -0.10], [-0.10, 0.10]] # torso_5 허용영역, base xy 볼록 사각형 [m]. 꼭짓점은 v1.3 URDF에서 수직 자세로 도달 확인
+torso_z_limits: [1.00, 1.20] # torso_5 높이 한계 (base z) [m]. 레디자세는 1.10
+torso_rot_limit_deg: [0.0, 0.0, 30.0] # 시작 자세 대비 torso_5 회전 한도 (base roll, pitch, yaw)
+torso_joint_limits_deg: # torso 관절 한계 [하한, 상한]. 보내기 전에 torso_5 목표를 이 안의 가장 가까운 자세로 바꾼다. 로봇 모델 한계를 넘으면 시작 오류
+  - [-15.0, 15.0]   # torso_0 (URDF 그대로)
+  - [0.0, 90.0]     # torso_1 (URDF -30~90에서 하한을 0으로)
+  - [-140.0, 80.0]  # torso_2
+  - [-45.0, 90.0]   # torso_3
+  - [-30.0, 30.0]   # torso_4
+  - [-135.0, 135.0] # torso_5
+
+# 리더암 (토크 값은 SDK 예제 35 기준)
+leader_device: "" # 빈 문자열이면 SDK가 장치를 찾는다
+leader_urdf: models/leader_arm.urdf
+leader_period_s: 0.01 # 100 Hz
+leader_torque_limit: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+leader_viscous_gain: [0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001, 0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001]
+leader_gravity_gain: 0.8 # 버튼을 누르고 있을 때 중력 보상 배율
+
+# 그리퍼 (리더암 트리거 0~1000 = 닫힘 정도, 예제 35처럼 버튼 클러치와 상관없이 따른다)
+use_gripper: false # 시뮬레이터에는 그리퍼 장치(/dev/rby1_gripper)가 없어서 false. 실물에선 true
+gripper_max_open: 1000 # 열었을 때 벌어지는 정도. 0(닫힘)~1000(끝까지)
+gripper_invert_trigger: false # 트리거를 당길수록 열리면 true로 바꾼다 (실물 리더암에서 미확인)
+
+# 기록
+log_enabled: true # true면 logs/에 CSV와 실행 설정 저장
