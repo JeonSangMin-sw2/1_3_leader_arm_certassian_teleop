@@ -41,16 +41,23 @@ class Robot:
                 if self.robot.reset_fault_control_manager():
                     break
                 time.sleep(0.5)
+        # is_power_on·is_servo_on은 정규식에 맞는 것이 모두 켜져 있어야 True. 이미 켜진 쪽은 다시 켜지 않는다
         power, servo = self.cfg["power_regex"], self.cfg["servo_regex"]
-        if not (self.robot.is_power_on(power) and self.robot.is_servo_on(servo)):
+        need_power = not self.robot.is_power_on(power)
+        need_servo = not self.robot.is_servo_on(servo)
+        if need_power or need_servo:
             self.robot.disable_control_manager()
             time.sleep(0.5)
-            if not self.robot.power_on(power):
-                raise RuntimeError(f"전원({power})을 켜지 못했습니다")
-            time.sleep(1.5)  # 12V 안정화, 리더암 모터 부팅 (예제 35는 1.0 s)
-            if not self.robot.servo_on(servo):
-                raise RuntimeError(f"서보({servo})를 켜지 못했습니다")
-            time.sleep(1.0)
+            if need_power:
+                if not self.robot.power_on(power):
+                    raise RuntimeError(f"전원({power})을 켜지 못했습니다")
+                time.sleep(1.5)  # 12V 안정화, 리더암 모터 부팅 (예제 35는 1.0 s)
+            if self.robot.is_servo_on(servo):  # 전원을 켠 뒤 다시 본다 (12V만 켰으면 서보는 그대로 켜져 있다)
+                print(f"[준비] 서보({servo})가 이미 켜져 있어 servo_on을 건너뜁니다", flush=True)
+            else:
+                if not self.robot.servo_on(servo):
+                    raise RuntimeError(f"서보({servo})를 켜지 못했습니다")
+                time.sleep(1.0)
             self.robot.reset_fault_control_manager()
         if not self.robot.enable_control_manager():
             raise RuntimeError("컨트롤 매니저를 활성화하지 못했습니다")

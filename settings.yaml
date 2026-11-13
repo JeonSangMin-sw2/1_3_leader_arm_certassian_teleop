@@ -76,7 +76,7 @@ fault_soft_stop: true # 리더암 장애 때 true: 소프트 정지(토크 감�
 # 그리퍼 (리더암 트리거 0~1000 = 닫힘 정도, 예제 35처럼 버튼 클러치와 상관없이 따른다)
 use_gripper: false # 시뮬레이터에는 그리퍼 장치(/dev/rby1_gripper)가 없어서 false. 실물에선 true
 gripper_max_open: 1000 # 열었을 때 벌어지는 정도. 0(닫힘)~1000(끝까지)
-gripper_invert_trigger: false # 트리거를 당길수록 열리면 true로 바꾼다 (실물 리더암에서 미확인)
+gripper_invert_trigger: true # 실물에서 false일 때 열고 닫는 방향이 반대였다 (예제 35 GRIPPER_DIRECTION=False와 같은 방향이 맞다)
 
 # 기록
 log_enabled: true # true면 logs/에 CSV와 실행 설정 저장
