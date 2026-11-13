@@ -51,7 +51,8 @@ settings.yaml의 어떤 값이든 명령줄 `--키 값`으로 덮어쓸 수 있�
 1. 로봇에 접속하고, 전원·서보가 꺼져 있으면 켠 뒤 컨트롤 매니저를 활성화한다. 서보는 `servo_regex`(기본 torso·양팔)만 켠다. 바퀴(모바일)와 머리는 켜지 않는다.
 2. **로봇이 레디자세로 움직인다 (5초).** `move_to_ready: false`면 건너뛴다.
 3. `use_gripper`면 툴 플랜지(그리퍼 전원)를 12V로 맞추고, 그리퍼가 homing으로 양 끝까지 움직인다.
-4. 리더암이 켜지고, 버튼을 누르지 않은 팔은 그 자리에 고정된다.
+4. 리더암이 켜지고, **로봇의 지금 팔 관절값으로 4초 동안 움직인다** (SDK 예제 35의 리더암 자세 정렬. `leader_align_duration_s`, 0이면 건너뛴다). 이 동안 버튼은 무시된다.
+5. 그 뒤 버튼을 누르지 않은 팔은 그 자세에 고정된다.
 
 ### 조작
 
@@ -100,6 +101,7 @@ settings.yaml의 어떤 값이든 명령줄 `--키 값`으로 덮어쓸 수 있�
 | `soft_margin_m` | `0.03` | 한계 앞 이 구간부터 부드럽게 감속 (영역, 팔 길이, 머리 높이) |
 | `hand_head_clearance_m` | `0.0` | 손이 머리 회전 중심보다 위로 못 가게 |
 | `use_gripper` | `false` | 시뮬레이터에는 그리퍼 장치가 없다 |
+| `leader_align_duration_s` | `4.0` | 시작할 때 리더암을 로봇 팔 관절값으로 옮기는 시간. 0이면 건너뛴다 |
 
 ## 5. 알려진 한계 (시뮬레이터에서 확인, 실물 미확인)
 
@@ -129,7 +131,7 @@ settings.yaml의 어떤 값이든 명령줄 `--키 값`으로 덮어쓸 수 있�
 | `teleop.py` | 매핑, torso 비율·허용영역·팔 길이·머리 높이 한도, 텔레옵 루프 |
 | `robot.py` | 로봇 접속·준비·상태·명령 스트림 (Cartesian, 관절), torso 관절 한계 투영 (`Robot`) |
 | `arm_ik.py` | 팔 관절 IK (`ArmIK`). rby1_3d_mouse_teleop의 joint_ik.py에서 가져옴 |
-| `leader_arm.py` | 리더암 중력 보상·버튼 클러치·트리거 (`LeaderArm`) |
+| `leader_arm.py` | 리더암 자세 정렬·중력 보상·버튼 클러치·트리거 (`LeaderArm`) |
 | `gripper.py` | 그리퍼 homing·트리거 추종 (`Gripper`). `/dev/rby1_gripper`는 UPC에만 있다 |
 | `so3.py` | 회전 벡터 ↔ 회전 행렬 |
 | `settings.py`, `settings.yaml` | 설정 읽기 (키 검사, 명령줄 덮어쓰기), 기본값 |

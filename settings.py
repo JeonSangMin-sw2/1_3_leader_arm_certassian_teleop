@@ -20,7 +20,7 @@ KEYS = (
     "torso_mode", "hand_reference", "torso_ratio_xyz", "torso_ratio_rot", "torso_region_xy", "torso_z_limits", "torso_rot_limit_deg",
     "torso_joint_limits_deg",
     "leader_device", "leader_urdf", "leader_period_s", "leader_torque_limit", "leader_viscous_gain",
-    "leader_gravity_gain", "leader_timeout_s", "soft_stop_time_s", "fault_soft_stop",
+    "leader_gravity_gain", "leader_align_duration_s", "leader_timeout_s", "soft_stop_time_s", "fault_soft_stop",
     "use_gripper", "gripper_max_open", "gripper_invert_trigger",
     "log_enabled",
 )

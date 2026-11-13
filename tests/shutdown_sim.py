@@ -33,6 +33,9 @@ class FakeLeader:
     def alive(self, timeout):
         return self.fail_after is None or time.monotonic() - self.t0 < self.fail_after
 
+    def align(self, target_q, duration, stop_event):  # 움직이지 않고 호출만 기록한다
+        FakeLeader.calls.append(("leader.align", len(target_q), round(time.monotonic() - self.t0, 2)))
+
     def latest(self):
         return _sim.both(_sim.READY), (False, False), (0.0, 0.0)
 

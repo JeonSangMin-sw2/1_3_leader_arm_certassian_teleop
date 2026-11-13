@@ -165,6 +165,8 @@ def validate(cfg):
         raise ValueError(f"arm_reach_ratio는 0과 1 사이여야 합니다: {cfg['arm_reach_ratio']}")
     if cfg["scale"] <= 0:
         raise ValueError(f"scale은 0보다 커야 합니다: {cfg['scale']}")
+    if cfg["leader_align_duration_s"] < 0:
+        raise ValueError(f"leader_align_duration_s는 0 이상이어야 합니다: {cfg['leader_align_duration_s']}")
     for key, n in (("leader_torque_limit", 14), ("leader_viscous_gain", 14)):
         if len(cfg[key]) != n:
             raise ValueError(f"{key}는 값 {n}개여야 합니다")
@@ -449,6 +451,7 @@ def main():
             gripper.connect()  # homing으로 손가락이 양 끝까지 움직인다
         leader = LeaderArm(cfg)
         leader.start()
+        leader.align(robot.arm_q(), cfg["leader_align_duration_s"], stop_event)  # 예제 35: 리더암을 로봇 팔 자세로
         log_path = Teleop(cfg, robot, leader, gripper).run(stop_event=stop_event)
         if log_path:
             print(f"log: {log_path}")

@@ -131,6 +131,10 @@ class Robot:
         if not self.robot.power_off(".*"):
             raise RuntimeError("전원을 끄지 못했습니다")
 
+    def arm_q(self):
+        """지금 팔 관절값 14개 (오른팔 7, 왼팔 7) [rad]. 상태 스트림 없이 한 번 읽는다."""
+        return np.array(self.robot.get_state().position)[self.arm_idx]
+
     def kinematics(self):
         """최신 상태에서 (q, T_base_torso5, (T_base_ee_right, T_base_ee_left), 가장 가까운 링크 거리)."""
         rs = self._latest["rs"]
